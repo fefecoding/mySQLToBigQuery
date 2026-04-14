@@ -1,6 +1,6 @@
 # MySQL to BigQuery Data Pipeline
 
-This project is my hands-on practice building a data pipeline from MySQL to BigQuery. I wanted to understand the full flow — from setting up a database, generating realistic test data, transforming it with SQL, and getting it into BigQuery for analytics.
+This project is my hands-on practice building a data pipeline from MySQL to BigQuery. I wanted to understand the full flow, from setting up a database, generating realistic test data, transforming it with SQL, and getting it into BigQuery for analytics.
 
 ---
 
@@ -8,19 +8,19 @@ This project is my hands-on practice building a data pipeline from MySQL to BigQ
 
 The pipeline does a few things:
 
-1. **Runs MySQL in Docker** — so it's easy to spin up and tear down
-2. **Generates mock data** — students, schools, courses, and enrollments using stored procedures and UDFs
-3. **Transforms the data** — joins tables into a clean, analytics-ready format
-4. **Pushes to BigQuery** — replicates the final dataset to Google Cloud for querying
+1. **Runs MySQL in Docker** so it's easy to spin up and tear down
+2. **Generates mock data** students, schools, courses, and enrollments using stored procedures and UDFs
+3. **Transforms the data** joins tables into a clean, analytics-ready format
+4. **Pushes to BigQuery** replicates the final dataset to Google Cloud for querying
 
 ---
 
 ## Tech Stack
 
-- **Docker** — containerized MySQL + Adminer (for a UI)
-- **MySQL** — relational database with foreign keys and constraints
-- **Google Cloud Platform** — Compute Engine, Container Registry, BigQuery
-- **SQL** — stored procedures, user-defined functions, data modeling
+- **Docker** containerized MySQL + Adminer (for a UI)
+- **MySQL** relational database with foreign keys and constraints
+- **Google Cloud Platform** Compute Engine, Container Registry, BigQuery
+- **SQL** stored procedures, user-defined functions, data modeling
 
 ---
 
@@ -49,8 +49,8 @@ docker-compose up -d
 ```
 
 This starts two containers:
-- **MySQL** — the database (port 3306)
-- **Adminer** — a lightweight web UI for browsing the DB (port 8080)
+- **MySQL** the database (port 3306)
+- **Adminer** a lightweight web UI for browsing the DB (port 8080)
 
 Check it's running with `docker ps`, then head to `http://localhost:8080` and log in with the credentials from the `.env` file.
 
@@ -64,13 +64,13 @@ docker-compose exec -T mysql mysql -uroot -ppassword < scripts/udf.sql
 docker-compose exec -T mysql mysql -uroot -ppassword < scripts/store_procedure.sql
 ```
 
-**4. Generate mock data** — populates tables:
+**4. Generate mock data**populates tables:
 ```bash
 docker-compose exec -T mysql mysql -uroot -ppassword < scripts/populate_data.sql
 ```
 This creates 1,000 students, 10 schools, 3 courses, and 3,000 enrollment records.
 
-**5. Add foreign keys** — enforces referential integrity:
+**5. Add foreign keys** enforces referential integrity:
 ```bash
 docker-compose exec -T mysql mysql -uroot -ppassword < scripts/modeling_data.sql
 ```
@@ -123,19 +123,19 @@ gcloud compute instances create-with-container mysqlvm \
 
 With MySQL running on GCP, the final step is getting the `bq_data` table into BigQuery. This can be done with:
 
-- **BigQuery Data Transfer Service** — scheduled transfers from MySQL
-- **Cloud Composer (Airflow)** — orchestrate the ETL pipeline
-- **Custom script** — using the BigQuery API or `bq` command-line tool
+- **BigQuery Data Transfer Service** scheduled transfers from MySQL
+- **Cloud Composer (Airflow)**  orchestrate the ETL pipeline
+- **Custom script** using the BigQuery API or `bq` command-line tool
 
 ---
 
 ## What I Learned
 
-- **Docker for data engineering** — containerizing databases makes them reproducible and easy to share
-- **SQL at scale** — stored procedures and UDFs are powerful for data generation and transformation
-- **Data modeling trade-offs** — normalized schemas for transactions vs. denormalized for analytics
-- **GCP integration** — moving data between Compute Engine, Container Registry, and BigQuery
-- **End-to-end pipeline thinking** — from raw data to analytics-ready tables
+- **Docker for data engineering**  containerizing databases makes them reproducible and easy to share
+- **SQL at scale**  stored procedures and UDFs are powerful for data generation and transformation
+- **Data modeling trade-offs**  normalized schemas for transactions vs. denormalized for analytics
+- **GCP integration**  moving data between Compute Engine, Container Registry, and BigQuery
+- **End-to-end pipeline thinking**  from raw data to analytics-ready tables
 
 ---
 
