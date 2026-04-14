@@ -1,141 +1,187 @@
 # MySQL to BigQuery Data Pipeline
 
-This mini-project demonstrates how to set up a MySQL database in a Docker container and replicate its data to a BigQuery table on Google Cloud Platform (GCP).
+This project is my hands-on practice building a data pipeline from MySQL to BigQuery. I wanted to understand the full flow — from setting up a database, generating realistic test data, transforming it with SQL, and getting it into BigQuery for analytics.
 
 ---
 
-## **Project Objectives**
+## What I Built
 
-- Set up a MySQL database using Docker.
-- Populate and manage data in MySQL.
-- Upload the Docker container image to GCP.
-- Replicate the MySQL data to BigQuery.
+The pipeline does a few things:
 
----
-
-## **Table of Contents**
-
-1. [Setup MySQL Database in Docker](#step-1-setup-mysql-database-in-docker)
-2. [Upload Docker Container to GCP](#step-2-upload-docker-container-to-gcp)
-3. [Access and Populate MySQL Database](#step-3-access-and-populate-mysql-database)
-4. [Replicate Data to BigQuery](#step-4-replicate-data-to-bigquery)
+1. **Runs MySQL in Docker** — so it's easy to spin up and tear down
+2. **Generates mock data** — students, schools, courses, and enrollments using stored procedures and UDFs
+3. **Transforms the data** — joins tables into a clean, analytics-ready format
+4. **Pushes to BigQuery** — replicates the final dataset to Google Cloud for querying
 
 ---
 
-## **Step 1: Setup MySQL Database in Docker**
+## Tech Stack
 
-### **1.1 Run the Docker Compose File**
-Execute the `docker-compose.yml` file to spin up the MySQL container:
+- **Docker** — containerized MySQL + Adminer (for a UI)
+- **MySQL** — relational database with foreign keys and constraints
+- **Google Cloud Platform** — Compute Engine, Container Registry, BigQuery
+- **SQL** — stored procedures, user-defined functions, data modeling
+
+---
+
+## Step-by-Step Walkthrough
+
+### Quick Setup (One Command)
+
+I added a setup script that does everything automatically:
+
 ```bash
-docker-compose up
+chmod +x setup.sh
+./setup.sh
 ```
 
-### **1.2 Verify the Container is Running**
-Check if the MySQL and Adminer containers are running:
+This will build the containers, wait for MySQL to be ready, and run all the SQL scripts in the right order.
 
+---
+
+### Manual Setup (Step by Step)
+
+If you prefer to do it manually, here's how:
+
+**1. Start the containers:**
 ```bash
-docker ps
-```
-Visit http://localhost:8080/ to verify the database initialization. Use the root username and password specified in the .env file. The database is initialized based on the ./mysql/data.sql script.
-
-
-## **Step 2: Upload Docker Container to GCP**
-### **2.1 Tag the Docker Container**
-Tag the MySQL container with your Docker Hub repository:
-
-```bash
-docker tag comdockerdevenvironmentscode_mysql trannammai/final_mysql_image
+docker-compose up -d
 ```
 
-### **2.2 Login to Docker Hub**
-Authenticate with your Docker Hub credentials:
+This starts two containers:
+- **MySQL** — the database (port 3306)
+- **Adminer** — a lightweight web UI for browsing the DB (port 8080)
 
+Check it's running with `docker ps`, then head to `http://localhost:8080` and log in with the credentials from the `.env` file.
+
+**2. Load UDFs** — custom functions for generating random data:
 ```bash
-docker login
+docker-compose exec -T mysql mysql -uroot -ppassword < scripts/udf.sql
 ```
 
-### **2.3 Push the Docker Image**
-Push the container image to Docker Hub:
-
+**3. Create stored procedures** — automates bulk data insertion:
 ```bash
+docker-compose exec -T mysql mysql -uroot -ppassword < scripts/store_procedure.sql
+```
+
+**4. Generate mock data** — populates tables:
+```bash
+docker-compose exec -T mysql mysql -uroot -ppassword < scripts/populate_data.sql
+```
+This creates 1,000 students, 10 schools, 3 courses, and 3,000 enrollment records.
+
+**5. Add foreign keys** — enforces referential integrity:
+```bash
+docker-compose exec -T mysql mysql -uroot -ppassword < scripts/modeling_data.sql
+```
+
+---
+
+### Step 3: Transform Data for BigQuery
+
+The raw tables are normalized (good for OLTP), but for analytics we want a flatter, denormalized structure. The `scripts/to_bigquery.sql` script joins everything into a single `bq_data` table:
+
+```sql
+CREATE TABLE bq_data AS
+SELECT id_std, name_std, dob_std, name_sch, name_crs, date_regist
+FROM students JOIN schools ... JOIN courses ...
+```
+
+You can preview it:
+```sql
+SELECT * FROM bq_data LIMIT 20;
+```
+
+---
+
+### Step 4: Deploy MySQL to GCP
+
+To make the database accessible from BigQuery (or just to host it in the cloud), I pushed the Docker image to GCP:
+
+**Tag and push to Docker Hub:**
+```bash
+docker tag <local_image> trannammai/final_mysql_image
 docker push trannammai/final_mysql_image
 ```
 
-### **2.4 Enable GCP APIs**
-Ensure the following APIs are enabled in your GCP project:
-
-- BigQuery API
-- Container Registry API
-- Cloud Composer API
-
-### **2.5 Transfer Docker Image to GCP**
-Pull the Docker image from Docker Hub, tag it for GCP, and push it to the Container Registry:
-
+**Move to GCP Container Registry:**
 ```bash
 docker pull trannammai/final_mysql_image
 docker tag trannammai/final_mysql_image gcr.io/parabolic-wall-323414/final_image
 docker push gcr.io/parabolic-wall-323414/final_image
 ```
 
-### **2.6 Deploy Container on Compute Engine**
-Create a VM instance in Compute Engine and deploy the container:
-
+**Deploy on Compute Engine:**
 ```bash
 gcloud compute instances create-with-container mysqlvm \
     --container-image gcr.io/parabolic-wall-323414/final_image
 ```
 
-## **Step 3: Access and Populate MySQL Database**
-### **3.1 Connect to the VM Instance**
-Access the VM instance via SSH. Identify the container ID and connect to it:
+---
+
+### Step 5: Replicate to BigQuery
+
+With MySQL running on GCP, the final step is getting the `bq_data` table into BigQuery. This can be done with:
+
+- **BigQuery Data Transfer Service** — scheduled transfers from MySQL
+- **Cloud Composer (Airflow)** — orchestrate the ETL pipeline
+- **Custom script** — using the BigQuery API or `bq` command-line tool
+
+---
+
+## What I Learned
+
+- **Docker for data engineering** — containerizing databases makes them reproducible and easy to share
+- **SQL at scale** — stored procedures and UDFs are powerful for data generation and transformation
+- **Data modeling trade-offs** — normalized schemas for transactions vs. denormalized for analytics
+- **GCP integration** — moving data between Compute Engine, Container Registry, and BigQuery
+- **End-to-end pipeline thinking** — from raw data to analytics-ready tables
+
+---
+
+## Files in This Repo
+
+```
+.
+├── docker-compose.yml      # Spins up MySQL + Adminer
+├── .env                    # Database credentials and ports
+├── .gitignore              # Files to ignore in version control
+├── setup.sh                # One-command setup script
+├── mysql/
+│   ├── Dockerfile          # Custom MySQL image
+│   └── data.sql            # Initial schema
+└── scripts/
+    ├── udf.sql             # User-defined functions for random data
+    ├── store_procedure.sql # Bulk insertion procedure
+    ├── populate_data.sql   # Calls the procedure to fill tables
+    ├── modeling_data.sql   # Adds foreign keys
+    └── to_bigquery.sql     # Final transformation for BigQuery
+```
+
+---
+
+## Useful Commands
 
 ```bash
-docker ps
-docker exec -it <container_id> bash
+# Quick setup (recommended)
+chmod +x setup.sh && ./setup.sh
+
+# Start containers only
+docker-compose up -d
+
+# Stop and remove everything (including data)
+docker-compose down -v
+
+# View logs
+docker-compose logs -f mysql
+
+# Connect to MySQL directly
+docker-compose exec mysql mysql -uroot -ppassword
+
+# Quick data preview
+docker-compose exec mysql mysql -uroot -ppassword -e "SELECT COUNT(*) FROM mydb.bq_data;"
 ```
 
-### **3.2 Log in to MySQL**
-Inside the container, log in to the MySQL database:
+---
 
-```bash
-mysql -uroot -ppassword
-```
-
-### **3.3 Verify Database Initialization**
-List databases and tables to confirm initialization:
-
-```
-show databases; 
-use mydb;
-show tables;
-```
-
-### **3.4 Populate Data**
-Execute SQL scripts in the following order to populate data:
-
-- udf.sql
-- store_procedure.sql
-- populate_data.sql
-- modeling_data.sql
-
-### **3.5 Generate Final Dataset**
-Run the to_bigquery.sql script to generate a dataset of 1,000 students, 10 schools, and 3 course registrations per student:
-
-```sql
-source to_bigquery.sql;
-```
-
-### **3.6 Preview the Data**
-Preview the dataset before replication:
-
-```sql
-SELECT * FROM bq_data LIMIT 20;
-```
-
-## **Step 4: Replicate Data to BigQuery**
-Now that the data is ready to replicate to BigQuery
-
-# **Project Highlights**
-- Technologies Used: Docker, MySQL, BigQuery, GCP.
-- Key Features: Seamless containerization, robust data population scripts, and efficient cloud integration.
-Feel free to submit pull requests or open issues to improve this project
+Feel free to open an issue or PR if you see something that could be improved. This was a learning project and I'm always looking to make it better.
